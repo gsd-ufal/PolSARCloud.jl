@@ -1,4 +1,27 @@
-#module ImageProcessingService
+using ParallelAccelerator
+using ImageView
+
+include("/home/naelson/repositories/PolSARCloud.jl/src/ZoomImage.jl")
+include("/home/naelson/repositories/PolSARCloud.jl/src/PauliDecomposition.jl")
+imageFolder = "images/"
+
+#"/home/naelson/Área\ de\ Trabalho/"
+function selectImage(filetype;folder=imageFolder)    
+    
+    files = readdir(folder)
+    filter!(files) do a
+        contains(a,filetype)
+    end
+
+    #an image can have multiple bands in multiple files
+    imagePaths = Array(AbstractString, length(files))
+
+    for (i = 1:length(imagePaths))
+        imagePaths[i] = joinpath(folder, files[i])
+    end
+    return imagePaths
+end
+
 function initiate(image_id::Int64, business_model)
 end
 
@@ -20,104 +43,116 @@ end
 function get_bill()
 end
 
-
-
 #Sample algorithm
-function f(a::Real) 
- (a[-1,-1]+ a[-1,+1] + a[-1,0] + a[0,+1]+a[0,-1]+a[+1,+1]+a[+1,0]+a[+1,-1])
+function box_filter(a) 
+	((a[-1,-1]+ a[-1,+1] + a[-1,0] + a[0,+1]+a[0,-1]+a[+1,+1]+a[+1,0]+a[+1,-1])/8)
 end
 
-function process(algorithm=f, summary_size::Tuple{Int64,Int64}=(4,4), roi::Tuple{Int64,Int64}=(8,8), start::Tuple{Int64,Int64} = (1,1)) #roi --> [(x1,y1),(x2,y2)]
+function blur(a)
+			(a[-2,-2] * 0.003  + a[-1,-2] * 0.0133 + a[0,-2] * 0.0219 + a[1,-2] * 0.0133 + a[2,-2] * 0.0030 +
+             a[-2,-1] * 0.0133 + a[-1,-1] * 0.0596 + a[0,-1] * 0.0983 + a[1,-1] * 0.0596 + a[2,-1] * 0.0133 +
+             a[-2, 0] * 0.0219 + a[-1, 0] * 0.0983 + a[0, 0] * 0.1621 + a[1, 0] * 0.0983 + a[2, 0] * 0.0219 +
+             a[-2, 1] * 0.0133 + a[-1, 1] * 0.0596 + a[0, 1] * 0.0983 + a[1, 1] * 0.0596 + a[2, 1] * 0.0133 +
+             a[-2, 2] * 0.003  + a[-1, 2] * 0.0133 + a[0, 2] * 0.0219 + a[1, 2] * 0.0133 + a[2, 2] * 0.0030)
+end
 
-print("Input size: ",size(dataset))
+#blur
+
+#pauli
+
+#filter PolSAR
+
+
+src_height= 11858
+src_width = 1650
+roiHeight= 2500
+roiWidth = 1600
+zoomHeight  = 1000
+zoomWidth   = 1000
+startPos = (1,1)
+src = open("images/SanAnd_05508_10007_005_100114_L090HHHH_CX_01.mlc")
+
+
+function areLimitsWrong(summary_height,src_height,summary_width,src_width,starting_line,roi_height,roi_width,starting_col)
+#checking if the summary overleaps the roi
 print("\n")
-print("Summary size: ",summary_size)
-print("\n")
-print("Roi size: ",roi)
-print("\n")
-print("Starting point: ",start)
-print("\n")
-print("\n")
-print("Input dataset: \n", dataset)
-print("\n\n")
+print("summary_height: ",summary_height,"\n")
+print("src_height: ",src_height,"\n")
+print("src_width: ",src_width,"\n\n")
+print("starting_col: ",starting_col,"\n")
+print("starting_line: ",starting_line,"\n\n")
+print("roi_width: ",roi_width,"\n")
+print("roi_height: ",roi_height,"\n")
 
-	yRoiLeng = roi[1]
-	xRoiLeng = roi[2]
-	ySummSizeLeng = summary_size[1]
-	xSummSizeLeng = summary_size[2]
-	rowStep = Int64(round(yRoiLeng/ySummSizeLeng))
-	colStep = Int64(round(xRoiLeng/xSummSizeLeng))
-
-	
-
-	if (  (start[1] + roi[1] > length(dataset[:,1])) || 
-		  (start[2] + roi[2] > length(dataset[1,:])) ) 
-		println("Your region of interest overleaps the image size.")
-	else 
-	#get the roiSubArray from dataset. This subarra is delimited by the size of the window (roi) and the starting index (start)
-	roiSubArray = dataset[start[1]:roi[1]+start[1]-1, start[2]:roi[2]+start[2]-1] 
-	print(roiSubArray)
-	
-
-	resized = Real[]
-
-
-	for (y=1:colStep:size(roiSubArray)[2])
-
-		if (mod(colStep,y) != 0 || y==1)
-			column = Real[]
-
-			for (x=1:rowStep:size(roiSubArray)[1])
-				if (mod(rowStep, x) != 0 || x == 1)
-
-					push!(column, roiSubArray[x,y])
-				end
-			end
-
-			if (y==1) #This is a workarround. Fix it later (flag WK)
-				resized = column
-			end	
-			
-			resized = hcat(resized, column)
-
-			if (y==1) #This is undoing the workarround of flag WK
-				resized = resized[:,2]
-			end
-		end
+	if (summary_height > src_height || summary_width > src_width)
+		println("Your summary size overleaps the ROI size")
+		return true	
 	end
 
-	print("\n\n")
-	print("Summary without filter: \n")
-	print(resized)
-	print("\n")
-	
+	#Checking if roi_y > src_y
+	if ( (starting_line-1 + roi_height) > src_height)
+		
+		println("Your ROI height overleaps the source height")
+		return true
+	end
+		#Checking if roi_x > src_x		
+	if (starting_col-1 + roi_width > src_height)
+		println("Your ROI width overleaps the source frame.")
+		return true
+	end
+	return false
+end
 
-		xSummaryLeng = size(resized)[1]
-		ySummaryLeng = size(resized)[2]
+function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64}, start::Tuple{Int64,Int64}; debug::Bool=false, img::IOStream=src) 
+	starting_line = start[1]
+	starting_col = start[2]	
+	starting_pos =  starting_line + (starting_col-1)*src_width
+
+	roi_height = roi[1]
+	roi_width = roi[2]
+
+	summary_height = summary_size[1]
+	summary_width = summary_size[2]
+
+	row_step = Int64(round(roi_height/summary_height))
+	col_step = Int64(round(roi_width/summary_width))	
 
 
-		buffer = Array(Real,xSummaryLeng,ySummaryLeng) 
+	if (areLimitsWrong(summary_height,src_height,summary_width,src_width,starting_line,roi_height,roi_width,starting_col))		
+	else
+
+		srcs = selectImage("mlc")
+		roi_subarray = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, src) 
+
+		band_A = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[1]))
+		band_B = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[2]))
+		band_C = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[3]))
+
+		println("Deu zoom suave")		
+		println("Deu reshape suave")
+
+		roi_subarray = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)			
+
+		
+		buffer = Array(Real,summary_height,summary_width) 
+
+
+		
 		iterations = 1
+		println("Criou buffer suave")
+		runStencil(buffer, roi_subarray, iterations, :oob_src_zero) do b, a
+			b[0,0] =  algorithm(a)
+			return a, b
+		end
+		
 
-
-	runStencil(buffer, resized, iterations, :oob_src_zero) do b, a
-       b[0,0] =  algorithm(a)
-       return a, b
-    end
-    
-    print("\n \n")
-    print("Summary with filter (sum of neighbors): \n")
-    print(buffer)
-    print("\n \n")
-    print("\n \n")
-    print("\n \n")
-	
-    
-    return buffer
+		return roi_subarray
 	end
 end
 
-process()
-print("\n")
+function process()
+	return process(blur, (zoomWidth,zoomHeight), (roiHeight-1,roiWidth-1), startPos) 
+end
 
-#end
+
+
