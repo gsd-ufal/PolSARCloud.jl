@@ -1,13 +1,14 @@
 using ParallelAccelerator
 using ImageView
-include("/home/naelson/repositories/PolSAR.jl/src/ZoomImage.jl")
-include("/home/naelson/repositories/PolSAR.jl/src/PauliDecompositon.jl")
 
+include("/home/naelson/repositories/PolSARCloud.jl/src/ZoomImage.jl")
+include("/home/naelson/repositories/PolSARCloud.jl/src/PauliDecomposition.jl")
+imageFolder = "images/"
 
 #"/home/naelson/Área\ de\ Trabalho/"
-function selectImage(folder, filetype)    
+function selectImage(filetype;folder=imageFolder)    
     
-    files = readdir(imageFolder)
+    files = readdir(folder)
     filter!(files) do a
         contains(a,filetype)
     end
@@ -15,8 +16,8 @@ function selectImage(folder, filetype)
     #an image can have multiple bands in multiple files
     imagePaths = Array(AbstractString, length(files))
 
-    for (i = 1:length(image))
-        imagePaths[i] = joinpath(imageFolder, files[i])
+    for (i = 1:length(imagePaths))
+        imagePaths[i] = joinpath(folder, files[i])
     end
     return imagePaths
 end
@@ -43,9 +44,23 @@ function get_bill()
 end
 
 #Sample algorithm
-function f(a) 
-	((a[-1,-1]+ a[-1,+1] + a[-1,0] + a[0,+1]+a[0,-1]+a[+1,+1]+a[+1,0]+a[+1,-1])*0.8)
+function box_filter(a) 
+	((a[-1,-1]+ a[-1,+1] + a[-1,0] + a[0,+1]+a[0,-1]+a[+1,+1]+a[+1,0]+a[+1,-1])/8)
 end
+
+function blur(a)
+			(a[-2,-2] * 0.003  + a[-1,-2] * 0.0133 + a[0,-2] * 0.0219 + a[1,-2] * 0.0133 + a[2,-2] * 0.0030 +
+             a[-2,-1] * 0.0133 + a[-1,-1] * 0.0596 + a[0,-1] * 0.0983 + a[1,-1] * 0.0596 + a[2,-1] * 0.0133 +
+             a[-2, 0] * 0.0219 + a[-1, 0] * 0.0983 + a[0, 0] * 0.1621 + a[1, 0] * 0.0983 + a[2, 0] * 0.0219 +
+             a[-2, 1] * 0.0133 + a[-1, 1] * 0.0596 + a[0, 1] * 0.0983 + a[1, 1] * 0.0596 + a[2, 1] * 0.0133 +
+             a[-2, 2] * 0.003  + a[-1, 2] * 0.0133 + a[0, 2] * 0.0219 + a[1, 2] * 0.0133 + a[2, 2] * 0.0030)
+end
+
+#blur
+
+#pauli
+
+#filter PolSAR
 
 
 src_height= 11858
@@ -55,7 +70,7 @@ roiWidth = 1600
 zoomHeight  = 1000
 zoomWidth   = 1000
 startPos = (1,1)
-src = open("SanAnd_05508_10007_005_100114_L090HHHH_CX_01.mlc")
+src = open("images/SanAnd_05508_10007_005_100114_L090HHHH_CX_01.mlc")
 
 
 function areLimitsWrong(summary_height,src_height,summary_width,src_width,starting_line,roi_height,roi_width,starting_col)
@@ -104,27 +119,41 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 
 
 	if (areLimitsWrong(summary_height,src_height,summary_width,src_width,starting_line,roi_height,roi_width,starting_col))		
-	else 		
+	else
+
+		srcs = selectImage("mlc")
 		roi_subarray = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, src) 
+
+		band_A = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[1]))
+		band_B = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[2]))
+		band_C = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[3]))
 
 		println("Deu zoom suave")		
 		println("Deu reshape suave")
 
-		roi_subarray = PauliDecomposition(roi_subarray, roi_subarray, roi_subarray, summary_height, summary_width)			
+		roi_subarray = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)			
 
+		
 		buffer = Array(Real,summary_height,summary_width) 
 
-		iterations = 4
+
+		
+		iterations = 1
 		println("Criou buffer suave")
 		runStencil(buffer, roi_subarray, iterations, :oob_src_zero) do b, a
 			b[0,0] =  algorithm(a)
 			return a, b
 		end
+		
 
-		return buffer
+		return roi_subarray
 	end
 end
 
 function process()
-	return process(f, (zoomWidth,zoomHeight), (roiHeight-1,roiWidth-1), startPos) 
+	return process(blur, (zoomWidth,zoomHeight), (roiHeight-1,roiWidth-1), startPos) 
 end
+
+
+
+
