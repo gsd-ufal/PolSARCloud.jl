@@ -117,4 +117,3 @@ function ZoomImage(start, windowHeight, windowWidth, zoomHeight, zoomWidth, sour
   end
   return (imageVector)
 end
-

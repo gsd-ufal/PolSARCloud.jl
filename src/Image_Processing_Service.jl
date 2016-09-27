@@ -107,10 +107,10 @@ end
 
 src_height= 11858
 src_width = 1650
-roiHeight= 260
-roiWidth = 260
-zoomHeight  = 250
-zoomWidth   = 250
+roiHeight= 30
+roiWidth = 30
+zoomHeight  = 15
+zoomWidth   = 15
 startPos = (1000,1000)
 src = open("images/SanAnd_05508_10007_005_100114_L090HHHH_CX_01.mlc")
 
@@ -180,30 +180,60 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 		println("Deu zoom suave")		
 		println("Deu reshape suave")
 
-		roi_subarray = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)			
+		#roi_subarray = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)
 
-		return process(algorithm,summary_size, roi,roi_subarray)
+ 		band_A, band_B, band_C = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)
+
+		output = process(algorithm,summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64},band_A,band_B,band_C) 			
+
+		return output
 	end
 end
 
 #This function process a matrix. It's a subrotine for the bigger process function
-function process(algorithm,summary_size, roi, img) 
-		
+function process(algorithm,summary_size, roi, img...) 	
 
+		#buffer = zeros(Real,length(img[:,1,1]),length(img[1,:,1]),length(img[1,1,:]))
+		buffer_A = copy(img[1])
+		buffer_B = copy(img[2])
+		buffer_C = copy(img[3])
 		
-		buffer = copy(img)
 		iterations = 1
-		println("Criou buffer suave")
-		runStencil(buffer, img, iterations, :oob_src_zero) do b, a
-			b[0,0] =  algorithm(a)
+		println("Criou buffer ")	
+
+
+		#TODO create a wraper for these calls
+		runStencil(buffer_A, img[1], iterations, :oob_src_zero) do b, a
+			b[0,0] =  blur(a)
 			return a, b
 		end
+
+		runStencil(buffer_B, img[2], iterations, :oob_src_zero) do b, a
+			b[0,0] =  blur(a)
+			return a, b
+		end
+
+
+		runStencil(buffer_C, img[3], iterations, :oob_src_zero) do b, a
+			b[0,0] =  blur(a)
+			return a, b
+		end
+		buffer = pauliRGBeq = reshape([[buffer_A],[buffer_B],[buffer_C]],(summary_size[1],summary_size[2],3))
 		stacktrace!(algorithm, summary_size, roi,start,buffer)
-		return buffer
-		
+		return buffer		
 end
 
 
 function process()
 	return process(blur, (zoomWidth,zoomHeight), (roiHeight-1,roiWidth-1), startPos) 
 end
+
+x = process()
+
+ImageView.view(x)
+
+
+runStencil(x[:,:,1], y[:,:,1], iterations, :oob_src_zero) do b, a
+			b[0,0] =  1
+			return a, b
+		end
