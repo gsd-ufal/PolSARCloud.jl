@@ -1,9 +1,39 @@
 using ParallelAccelerator
 using ImageView
+using StatsBase
+
+
+
+
+
+
+
+
+
+
 
 include("/home/naelson/repositories/PolSARCloud.jl/src/ZoomImage.jl")
 include("/home/naelson/repositories/PolSARCloud.jl/src/PauliDecomposition.jl")
 imageFolder = "images/"
+
+
+
+tracing = true
+
+
+type Trace
+	step
+	algorithm
+	summary_size
+	roi
+	start
+	image
+end
+
+global_trace = Trace(0,[],[],[],[],[])
+
+
+
 
 #"/home/naelson/Área\ de\ Trabalho/"
 function selectImage(filetype;folder=imageFolder)    
@@ -21,6 +51,12 @@ function selectImage(filetype;folder=imageFolder)
     end
     return imagePaths
 end
+
+
+
+
+
+
 
 function initiate(image_id::Int64, business_model)
 end
@@ -43,6 +79,17 @@ end
 function get_bill()
 end
 
+function stacktrace!(algorithm, summary_size, roi,start,image; trace::Trace=global_trace)
+	trace.step+=1
+	push!(trace.algorithm,algorithm)
+	push!(trace.summary_size,summary_size)
+	push!(trace.roi,roi)
+	push!(trace.start,start)
+	push!(trace.image,image)
+end
+	
+
+
 #Sample algorithm
 function box_filter(a) 
 	((a[-1,-1]+ a[-1,+1] + a[-1,0] + a[0,+1]+a[0,-1]+a[+1,+1]+a[+1,0]+a[+1,-1])/8)
@@ -56,20 +103,15 @@ function blur(a)
              a[-2, 2] * 0.003  + a[-1, 2] * 0.0133 + a[0, 2] * 0.0219 + a[1, 2] * 0.0133 + a[2, 2] * 0.0030)
 end
 
-#blur
-
-#pauli
-
-#filter PolSAR
 
 
 src_height= 11858
 src_width = 1650
-roiHeight= 2500
-roiWidth = 1600
-zoomHeight  = 1000
-zoomWidth   = 1000
-startPos = (1,1)
+roiHeight= 151
+roiWidth = 151
+zoomHeight  = 150
+zoomWidth   = 150
+startPos = (1300,1300)
 src = open("images/SanAnd_05508_10007_005_100114_L090HHHH_CX_01.mlc")
 
 
@@ -103,7 +145,14 @@ print("roi_height: ",roi_height,"\n")
 	return false
 end
 
-function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64}, start::Tuple{Int64,Int64}; debug::Bool=false, img::IOStream=src) 
+
+
+
+
+
+
+#This function process the algorithm in the image following the specified roi begining in the start(int int) point
+function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64}, start::Tuple{Int64,Int64}; debug::Bool=false) 
 	starting_line = start[1]
 	starting_col = start[2]	
 	starting_pos =  starting_line + (starting_col-1)*src_width
@@ -114,8 +163,7 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 	summary_height = summary_size[1]
 	summary_width = summary_size[2]
 
-	row_step = Int64(round(roi_height/summary_height))
-	col_step = Int64(round(roi_width/summary_width))	
+	
 
 
 	if (areLimitsWrong(summary_height,src_height,summary_width,src_width,starting_line,roi_height,roi_width,starting_col))		
@@ -131,28 +179,92 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 		println("Deu zoom suave")		
 		println("Deu reshape suave")
 
-		roi_subarray = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)			
+		#roi_subarray = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)
+
+ 		band_A, band_B, band_C = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)
+
+		output = process(algorithm,summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64},band_A,band_B,band_C) 			
+
+		return output
+	end
+end
+
+#This function process a matrix. It's a subrotine for the bigger process function
+function process(algorithm,summary_size, roi, band_A,band_B,band_C) 	
 
 		
-		buffer = Array(Real,summary_height,summary_width) 
+		#buffer = zeros(Real,length(img[:,1,1]),length(img[1,:,1]),length(img[1,1,:]))
+
+
+
+
+		buffer_A = reshape(band_A,(summary_size[1],summary_size[2]))
+		buffer_B = reshape(band_B,(summary_size[1],summary_size[2]))
+		buffer_C = reshape(band_C,(summary_size[1],summary_size[2]))
+		
+		
+
+		buffer = Array(Real,summary_size[1],summary_size[2], 3)
+		
+
+
+		cpBand_A = copy(buffer_A)
+		cpBand_B = copy(buffer_B)
+		cpBand_C = copy(buffer_C)
+		
+
+
+
+
 
 
 		
 		iterations = 1
-		println("Criou buffer suave")
-		runStencil(buffer, roi_subarray, iterations, :oob_src_zero) do b, a
-			b[0,0] =  algorithm(a)
+		println("Criou buffer ")	
+
+
+		#TODO criar uma função para englobar estas chamadas da runStencil
+	
+		runStencil(buffer_A, cpBand_A, iterations, :oob_src_zero) do b, a
+			b[0,0] =  blur(a)
+			return a, b
+		end
+
+		runStencil(buffer_B, cpBand_B, iterations, :oob_src_zero) do b, a
+			b[0,0] =  blur(a)
+			return a, b
+		end
+
+		runStencil(buffer_C, cpBand_C, iterations, :oob_src_zero) do b, a
+			b[0,0] =  blur(a)
 			return a, b
 		end
 		
 
-		return roi_subarray
-	end
+
+		buffer[:,:,1] = buffer_A
+		buffer[:,:,2] = buffer_B
+		buffer[:,:,3] = buffer_C
+		
+
+		#Todo these vec calls are dumb and the should be removed
+		buffer_A = vec(buffer_A)
+		buffer_B = vec(buffer_B)
+		buffer_C = vec(buffer_C)
+
+		buffer = reshape([[buffer_A],[buffer_B],[buffer_C]],(summary_size[1],summary_size[2],3))
+		
+		#stacktrace!(algorithm, summary_size, roi,start,buffer)
+		return buffer
 end
+
 
 function process()
 	return process(blur, (zoomWidth,zoomHeight), (roiHeight-1,roiWidth-1), startPos) 
 end
 
+x = process()
+
+ImageView.view(x)
 
 

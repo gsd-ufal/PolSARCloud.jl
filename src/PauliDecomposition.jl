@@ -9,7 +9,10 @@ function PauliDecomposition(mHH, mHV, mVV, height, widht)
 	pauliReq = ecdf(pauliR)(pauliR)
 	pauliGeq = ecdf(pauliG)(pauliG)
 	pauliBeq = ecdf(pauliB)(pauliB)
-	pauliRGBeq = reshape([[pauliReq],[pauliGeq],[pauliBeq]],(widht,height,3))
+	#pauliRGBeq = reshape([[pauliReq],[pauliGeq],[pauliBeq]],(widht,height,3))
 
-	return pauliRGBeq
+	#return pauliRGBeq
+
+
+	return pauliReq,pauliGeq,pauliBeq
 end
