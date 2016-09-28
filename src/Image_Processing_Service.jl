@@ -107,11 +107,11 @@ end
 
 src_height= 11858
 src_width = 1650
-roiHeight= 30
-roiWidth = 30
-zoomHeight  = 15
-zoomWidth   = 15
-startPos = (1000,1000)
+roiHeight= 151
+roiWidth = 151
+zoomHeight  = 150
+zoomWidth   = 150
+startPos = (1300,1300)
 src = open("images/SanAnd_05508_10007_005_100114_L090HHHH_CX_01.mlc")
 
 
@@ -163,8 +163,7 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 	summary_height = summary_size[1]
 	summary_width = summary_size[2]
 
-	row_step = Int64(round(roi_height/summary_height))
-	col_step = Int64(round(roi_width/summary_width))	
+	
 
 
 	if (areLimitsWrong(summary_height,src_height,summary_width,src_width,starting_line,roi_height,roi_width,starting_col))		
@@ -191,36 +190,72 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 end
 
 #This function process a matrix. It's a subrotine for the bigger process function
-function process(algorithm,summary_size, roi, img...) 	
+function process(algorithm,summary_size, roi, band_A,band_B,band_C) 	
 
+		
 		#buffer = zeros(Real,length(img[:,1,1]),length(img[1,:,1]),length(img[1,1,:]))
-		buffer_A = copy(img[1])
-		buffer_B = copy(img[2])
-		buffer_C = copy(img[3])
+
+
+
+
+		buffer_A = reshape(band_A,(summary_size[1],summary_size[2]))
+		buffer_B = reshape(band_B,(summary_size[1],summary_size[2]))
+		buffer_C = reshape(band_C,(summary_size[1],summary_size[2]))
+		
+		
+
+		buffer = Array(Real,summary_size[1],summary_size[2], 3)
+		
+
+
+		cpBand_A = copy(buffer_A)
+		cpBand_B = copy(buffer_B)
+		cpBand_C = copy(buffer_C)
+		
+
+
+
+
+
+
 		
 		iterations = 1
 		println("Criou buffer ")	
 
 
-		#TODO create a wraper for these calls
-		runStencil(buffer_A, img[1], iterations, :oob_src_zero) do b, a
+		#TODO criar uma função para englobar estas chamadas da runStencil
+	
+		runStencil(buffer_A, cpBand_A, iterations, :oob_src_zero) do b, a
 			b[0,0] =  blur(a)
 			return a, b
 		end
 
-		runStencil(buffer_B, img[2], iterations, :oob_src_zero) do b, a
+		runStencil(buffer_B, cpBand_B, iterations, :oob_src_zero) do b, a
 			b[0,0] =  blur(a)
 			return a, b
 		end
 
-
-		runStencil(buffer_C, img[3], iterations, :oob_src_zero) do b, a
+		runStencil(buffer_C, cpBand_C, iterations, :oob_src_zero) do b, a
 			b[0,0] =  blur(a)
 			return a, b
 		end
-		buffer = pauliRGBeq = reshape([[buffer_A],[buffer_B],[buffer_C]],(summary_size[1],summary_size[2],3))
-		stacktrace!(algorithm, summary_size, roi,start,buffer)
-		return buffer		
+		
+
+
+		buffer[:,:,1] = buffer_A
+		buffer[:,:,2] = buffer_B
+		buffer[:,:,3] = buffer_C
+		
+
+		#Todo these vec calls are dumb and the should be removed
+		buffer_A = vec(buffer_A)
+		buffer_B = vec(buffer_B)
+		buffer_C = vec(buffer_C)
+
+		buffer = reshape([[buffer_A],[buffer_B],[buffer_C]],(summary_size[1],summary_size[2],3))
+		
+		#stacktrace!(algorithm, summary_size, roi,start,buffer)
+		return buffer
 end
 
 
@@ -233,7 +268,3 @@ x = process()
 ImageView.view(x)
 
 
-runStencil(x[:,:,1], y[:,:,1], iterations, :oob_src_zero) do b, a
-			b[0,0] =  1
-			return a, b
-		end
