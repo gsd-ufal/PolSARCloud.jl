@@ -266,8 +266,19 @@ function process(algorithm, img)
  	process(algorithm,(xlen,ylen), (xlen,ylen), img[:,:,1],img[:,:,2],img[:,:,3]) 
 end
 
-function process()
-	return process(blur, (zoomWidth,zoomHeight), (roiHeight-1,roiWidth-1), startPos) 
+
+function walktrace(trace::Trace, img)
+	algs = trace.algorithm
+	for i in algs
+		img = process(i,img)
+		print(img[100])
+	end
+end
+
+
+
+function process() #Method designed for implementation tests
+	return process(blur, (zoomWidth,zoomHeight), (roiHeight-1,roiWidth-1), startPos)  
 end
 
 x = process()
