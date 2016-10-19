@@ -12,8 +12,8 @@ using StatsBase
 
 
 
-include("/home/naelson/repositories/PolSARCloud.jl/src/ZoomImage.jl")
-include("/home/naelson/repositories/PolSARCloud.jl/src/PauliDecomposition.jl")
+include("/home/douglas/repositories/PolSARCloud.jl/src/ZoomImage.jl")
+include("/home/douglas/repositories/PolSARCloud.jl/src/PauliDecomposition.jl")
 imageFolder = "images/"
 
 
@@ -170,7 +170,7 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 	else
 
 		srcs = selectImage("mlc")
-		roi_subarray = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, src) 
+		
 
 		band_A = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[1]))
 		band_B = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[2]))
@@ -254,10 +254,17 @@ function process(algorithm,summary_size, roi, band_A,band_B,band_C)
 
 		buffer = reshape([[buffer_A],[buffer_B],[buffer_C]],(summary_size[1],summary_size[2],3))
 		
-		#stacktrace!(algorithm, summary_size, roi,start,buffer)
+		stacktrace!(algorithm, summary_size, roi,start,buffer)
 		return buffer
 end
 
+
+function process(algorithm, img)
+	ylen = length(img[:,:,1][:,1])
+	xlen = length(img[:,:,1][1,:])
+
+ 	process(algorithm,(xlen,ylen), (xlen,ylen), img[:,:,1],img[:,:,2],img[:,:,3]) 
+end
 
 function process()
 	return process(blur, (zoomWidth,zoomHeight), (roiHeight-1,roiWidth-1), startPos) 
