@@ -152,7 +152,7 @@ end
 
 
 #This function process the algorithm in the image following the specified roi begining in the start(int int) point
-function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64}, start::Tuple{Int64,Int64}; debug::Bool=false) 
+function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64}, start::Tuple{Int64,Int64},shiftTrace::Bool=true; debug::Bool=false) 
 	starting_line = start[1]
 	starting_col = start[2]	
 	starting_pos =  starting_line + (starting_col-1)*src_width
@@ -190,7 +190,7 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 end
 
 #This function process a matrix. It's a subrotine for the bigger process function
-function process(algorithm,summary_size, roi, band_A,band_B,band_C) 	
+function process(algorithm,summary_size, roi, band_A,band_B,band_C,shiftTrace::Bool=true) 	
 
 		
 		#buffer = zeros(Real,length(img[:,1,1]),length(img[1,:,1]),length(img[1,1,:]))
@@ -253,26 +253,31 @@ function process(algorithm,summary_size, roi, band_A,band_B,band_C)
 		buffer_C = vec(buffer_C)
 
 		buffer = reshape([[buffer_A],[buffer_B],[buffer_C]],(summary_size[1],summary_size[2],3))
-		
-		stacktrace!(algorithm, summary_size, roi,start,buffer)
+		if (shiftTrace)
+			stacktrace!(algorithm, summary_size, roi,start,buffer)
+		end
 		return buffer
 end
 
 
-function process(algorithm, img)
+function process(algorithm, img,shiftTrace::Bool=true)
 	ylen = length(img[:,:,1][:,1])
 	xlen = length(img[:,:,1][1,:])
 
- 	process(algorithm,(xlen,ylen), (xlen,ylen), img[:,:,1],img[:,:,2],img[:,:,3]) 
+ 	process(algorithm,(xlen,ylen), (xlen,ylen), img[:,:,1],img[:,:,2],img[:,:,3],shiftTrace) 
 end
 
 
-function walktrace(trace::Trace, img)
+function walktrace(trace::Trace, img,shiftTrace::Bool=false)
 	algs = trace.algorithm
-	for i in algs
-		img = process(i,img)
-		print(img[100])
+	newImg = -1
+	for i = 1:length(algs)
+		println(i)
+		newImg = process(algs[i],img,shiftTrace)		
+		img = copy(newImg)
 	end
+	
+	return newImg
 end
 
 
@@ -281,8 +286,17 @@ function process() #Method designed for implementation tests
 	return process(blur, (zoomWidth,zoomHeight), (roiHeight-1,roiWidth-1), startPos)  
 end
 
+
+function removefilter(trace::Trace, index)
+	if (index > 1)
+		print("There's no such filter in this index")
+	end
+end
+
+
+
 x = process()
 
-ImageView.view(x)
+#ImageView.view(x)
 
 
