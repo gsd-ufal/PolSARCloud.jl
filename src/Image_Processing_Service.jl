@@ -36,6 +36,9 @@ global_trace = Trace(0,[],[],[],[],[])
 
 
 #"/home/naelson/Área\ de\ Trabalho/"
+
+
+
 function selectImage(filetype;folder=imageFolder)    
     
     files = readdir(folder)
@@ -78,6 +81,9 @@ end
 
 function get_bill()
 end
+
+
+
 
 function stacktrace!(algorithm, summary_size, roi,start,image; trace::Trace=global_trace)
 	trace.step+=1
@@ -166,28 +172,31 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 	
 
 
-	if (areLimitsWrong(summary_height,src_height,summary_width,src_width,starting_line,roi_height,roi_width,starting_col))		
-	else
+	if (areLimitsWrong(summary_height,src_height,summary_width,src_width,starting_line,roi_height,roi_width,starting_col))				
+		else
 
-		srcs = selectImage("mlc")
-		
+			srcs = selectImage("mlc")
+			
 
-		band_A = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[1]))
-		band_B = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[2]))
-		band_C = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[3]))
+			band_A = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[1]))
+			band_B = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[2]))
+			band_C = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[3]))
 
-		println("Deu zoom suave")		
-		println("Deu reshape suave")
+			println("Deu zoom suave")		
+			println("Deu reshape suave")
 
-		#roi_subarray = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)
+			#roi_subarray = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)
 
- 		band_A, band_B, band_C = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)
+	 		band_A, band_B, band_C = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)
 
-		output = process(algorithm,summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64},band_A,band_B,band_C) 			
+			output = process(algorithm,summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64},band_A,band_B,band_C) 			
 
-		return output
-	end
+			return output
+		end
 end
+
+
+
 
 #This function process a matrix. It's a subrotine for the bigger process function
 function process(algorithm,summary_size, roi, band_A,band_B,band_C,shiftTrace::Bool=true) 	
@@ -246,16 +255,32 @@ function process(algorithm,summary_size, roi, band_A,band_B,band_C,shiftTrace::B
 		buffer[:,:,2] = buffer_B
 		buffer[:,:,3] = buffer_C
 		
-
+		
 		#Todo these vec calls are dumb and the should be removed
 		buffer_A = vec(buffer_A)
 		buffer_B = vec(buffer_B)
 		buffer_C = vec(buffer_C)
+		println("Criou buffer x")
+		print("BUFFER A ",length(buffer_A))
+		print("\n")
+		print("BUFFER B ",length(buffer_B))
+		print("\n")
+		print("BUFFER C ",length(buffer_C))
+		print("\n")
+
+		print("SUmmary size 1 ",summary_size[1])
+		print("\n")
+		print("SUmmary size 2 ",summary_size[2])
+		print("\n")
+
 
 		buffer = reshape([[buffer_A],[buffer_B],[buffer_C]],(summary_size[1],summary_size[2],3))
+
 		if (shiftTrace)
 			stacktrace!(algorithm, summary_size, roi,start,buffer)
 		end
+
+		#return reshape([[band_A],[band_B],[band_C]], (150,150,3))
 		return buffer
 end
 
@@ -287,9 +312,12 @@ function process() #Method designed for implementation tests
 end
 
 
-function removefilter(trace::Trace, index)
-	if (index > 1)
+function removefilter!(trace::Trace, index)
+	if ((index < 1) || (index > length(trace.algorithm)))
 		print("There's no such filter in this index")
+	else
+		deleteat!(trace.algorithm, index)
+		print("Filter removed")
 	end
 end
 
@@ -297,6 +325,6 @@ end
 
 x = process()
 
-#ImageView.view(x)
+ImageView.view(x)
 
 
