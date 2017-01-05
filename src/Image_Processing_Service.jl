@@ -4,17 +4,21 @@ using StatsBase
 
 
 
-
-
-
-
-
-
-
-
 include("/home/douglas/repositories/PolSARCloud.jl/src/ZoomImage.jl")
 include("/home/douglas/repositories/PolSARCloud.jl/src/PauliDecomposition.jl")
 imageFolder = "images/"
+test_output="test_output.csv"
+tic()
+toc()
+
+
+if(isfile("test_output.csv"))
+	test_log = readcsv(test_output)
+else
+	
+	test_log = ["Zoom_A","Zoom_B","Zoom_C","Decomposition","Filter_A","Filter_B","Filter_C","Process_Time"]'
+	writecsv(test_output,test_log)	
+end
 
 
 
@@ -33,7 +37,18 @@ end
 global_trace = Trace(0,[],[],[],[],[])
 
 
+function insertfilter!(trace::Trace, algorithm, pos::Int)
+	trace.algorithm[pos] = algorithm
+end
 
+function appendfilter!(trace::Trace, algorithm)	
+	insertfilter!(trace,algorithm,length(trace.algorithm))
+end
+
+
+function stackfilter!(trace::Trace, algorithm)
+
+end
 
 #"/home/naelson/Área\ de\ Trabalho/"
 
@@ -123,14 +138,14 @@ src = open("images/SanAnd_05508_10007_005_100114_L090HHHH_CX_01.mlc")
 
 function areLimitsWrong(summary_height,src_height,summary_width,src_width,starting_line,roi_height,roi_width,starting_col)
 #checking if the summary overleaps the roi
-print("\n")
-print("summary_height: ",summary_height,"\n")
-print("src_height: ",src_height,"\n")
-print("src_width: ",src_width,"\n\n")
-print("starting_col: ",starting_col,"\n")
-print("starting_line: ",starting_line,"\n\n")
-print("roi_width: ",roi_width,"\n")
-print("roi_height: ",roi_height,"\n")
+#print("\n")
+#print("summary_height: ",summary_height,"\n")
+#print("src_height: ",src_height,"\n")
+#print("src_width: ",src_width,"\n\n")
+#print("starting_col: ",starting_col,"\n")
+#print("starting_line: ",starting_line,"\n\n")
+#print("roi_width: ",roi_width,"\n")
+#print("roi_height: ",roi_height,"\n")
 
 	if (summary_height > src_height || summary_width > src_width)
 		println("Your summary size overleaps the ROI size")
@@ -176,21 +191,33 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 		else
 
 			srcs = selectImage("mlc")
-			
-
+			tic() #for total time?
+			tic()
 			band_A = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[1]))
-			band_B = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[2]))
-			band_C = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[3]))
+			zoomA_time = toc()
 
-			println("Deu zoom suave")		
-			println("Deu reshape suave")
+			tic()
+			band_B = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[2]))
+			zoomB_time = toc()
+
+			tic()
+			band_C = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[3]))
+			zoomC_time = toc()
+
+			#println("Deu zoom suave")		
+			#println("Deu reshape suave")
 
 			#roi_subarray = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)
-
+			tic()
 	 		band_A, band_B, band_C = PauliDecomposition(band_A, band_B, band_C, summary_height, summary_width)
+	 		decomposition_time = toc()
 
-			output = process(algorithm,summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64},band_A,band_B,band_C) 			
-
+			output,filters_time = process(algorithm,summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64},band_A,band_B,band_C) 			
+			total_time = toc()
+			
+			new_test = round([zoomA_time,zoomB_time,zoomC_time,decomposition_time,filters_time[1],filters_time[2],filters_time[3],total_time]',4)
+			new_test = vcat(test_log, new_test)			
+			writecsv(test_output,new_test)
 			return output
 		end
 end
@@ -229,25 +256,32 @@ function process(algorithm,summary_size, roi, band_A,band_B,band_C,shiftTrace::B
 
 		
 		iterations = 1
-		println("Criou buffer ")	
+		#println("Criou buffer ")	
 
 
 		#TODO criar uma função para englobar estas chamadas da runStencil
-	
+		tic()
 		runStencil(buffer_A, cpBand_A, iterations, :oob_src_zero) do b, a
 			b[0,0] =  blur(a)
 			return a, b
 		end
+		filter_A = toc()
 
+
+		tic()
 		runStencil(buffer_B, cpBand_B, iterations, :oob_src_zero) do b, a
 			b[0,0] =  blur(a)
 			return a, b
 		end
+		filter_B = toc()
 
+
+		tic()
 		runStencil(buffer_C, cpBand_C, iterations, :oob_src_zero) do b, a
 			b[0,0] =  blur(a)
 			return a, b
 		end
+		filter_C = toc()
 		
 
 
@@ -260,18 +294,18 @@ function process(algorithm,summary_size, roi, band_A,band_B,band_C,shiftTrace::B
 		buffer_A = vec(buffer_A)
 		buffer_B = vec(buffer_B)
 		buffer_C = vec(buffer_C)
-		println("Criou buffer x")
-		print("BUFFER A ",length(buffer_A))
-		print("\n")
-		print("BUFFER B ",length(buffer_B))
-		print("\n")
-		print("BUFFER C ",length(buffer_C))
-		print("\n")
+		#println("Criou buffer x")
+		#print("BUFFER A ",length(buffer_A))
+		#print("\n")
+		#print("BUFFER B ",length(buffer_B))
+		#print("\n")
+		#print("BUFFER C ",length(buffer_C))
+		#print("\n")
 
-		print("SUmmary size 1 ",summary_size[1])
-		print("\n")
-		print("SUmmary size 2 ",summary_size[2])
-		print("\n")
+		#print("SUmmary size 1 ",summary_size[1])
+		#print("\n")
+		#print("SUmmary size 2 ",summary_size[2])
+		#print("\n")
 
 
 		buffer = reshape([[buffer_A],[buffer_B],[buffer_C]],(summary_size[1],summary_size[2],3))
@@ -281,7 +315,7 @@ function process(algorithm,summary_size, roi, band_A,band_B,band_C,shiftTrace::B
 		end
 
 		#return reshape([[band_A],[band_B],[band_C]], (150,150,3))
-		return buffer
+		return buffer,[filter_A,filter_B,filter_C]'
 end
 
 
@@ -297,7 +331,7 @@ function walktrace(trace::Trace, img,shiftTrace::Bool=false)
 	algs = trace.algorithm
 	newImg = -1
 	for i = 1:length(algs)
-		println(i)
+		#println(i)
 		newImg = process(algs[i],img,shiftTrace)		
 		img = copy(newImg)
 	end
@@ -314,10 +348,10 @@ end
 
 function removefilter!(trace::Trace, index)
 	if ((index < 1) || (index > length(trace.algorithm)))
-		print("There's no such filter in this index")
+		#print("There's no such filter in this index")
 	else
 		deleteat!(trace.algorithm, index)
-		print("Filter removed")
+		#print("Filter removed")
 	end
 end
 
@@ -325,6 +359,6 @@ end
 
 x = process()
 
-ImageView.view(x)
+#ImageView.view(x)
 
 
