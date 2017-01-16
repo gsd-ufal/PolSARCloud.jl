@@ -1,12 +1,6 @@
 using Images
 include("Image_Processing_Service.jl")
 
-
-
-
-
-
-
 function getbands(summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64}, start::Tuple{Int64,Int64}) 
 	starting_line = start[1]
 	starting_col = start[2]	
@@ -36,8 +30,47 @@ function getbands(summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64}, sta
 			
 			
 			
-			return band_A,band_B,band_C
+			return reshape(band_A,roiHeight,roiWidth),reshape(band_B,roiHeight,roiWidth),reshape(band_C,roiHeight,roiWidth)
 		end
 end
 
 band_A,band_B,band_C = getbands((roiHeight,roiWidth), (roiHeight,roiWidth),startPos)
+
+
+
+serialtest_output = "serial_test_output.csv"
+
+	if(isfile(serialtest_output))
+		test_log = readcsv(serialtest_output)
+	else	
+		test_log = ["Filter_A","Filter_B","Filter_C","Total Time"]'
+		writecsv(serialtest_output,test_log)	
+	end
+
+function serialtest()
+	sigma=[5,5]
+	tic()
+	toc()
+	for (i=1:30)
+		test_log = readcsv(serialtest_output)
+		tic()
+		tic()
+		imfilter_gaussian(band_A,[sigma[1],sigma[2]])
+		bandA_time = toc()
+		
+		tic()
+		imfilter_gaussian(band_B,[sigma[1],sigma[2]])
+		bandB_time = toc()
+
+		tic()
+		imfilter_gaussian(band_C,[sigma[1],sigma[2]])
+		bandC_time = toc()
+		totalTime = toc()
+		newtest = [bandA_time,bandB_time,bandC_time,totalTime]';
+		
+
+		newtest = vcat(test_log, newtest)	
+		writecsv(serialtest_output,newtest)
+	end
+
+end
