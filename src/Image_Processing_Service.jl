@@ -128,24 +128,16 @@ end
 
 src_height= 11858
 src_width = 1650
-roiHeight= 151
-roiWidth = 151
-zoomHeight  = 150
-zoomWidth   = 150
-startPos = (1300,1300)
+roiHeight= 1001
+roiWidth = 1001
+zoomHeight  = 1000
+zoomWidth   = 1000
+startPos = (1,1)
 src = open("images/SanAnd_05508_10007_005_100114_L090HHHH_CX_01.mlc")
 
 
 function areLimitsWrong(summary_height,src_height,summary_width,src_width,starting_line,roi_height,roi_width,starting_col)
-#checking if the summary overleaps the roi
-#print("\n")
-#print("summary_height: ",summary_height,"\n")
-#print("src_height: ",src_height,"\n")
-#print("src_width: ",src_width,"\n\n")
-#print("starting_col: ",starting_col,"\n")
-#print("starting_line: ",starting_line,"\n\n")
-#print("roi_width: ",roi_width,"\n")
-#print("roi_height: ",roi_height,"\n")
+
 
 	if (summary_height > src_height || summary_width > src_width)
 		println("Your summary size overleaps the ROI size")
@@ -191,7 +183,7 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 		else
 
 			srcs = selectImage("mlc")
-			tic() #for total time?
+			tic() #for total time
 			tic()
 			band_A = ZoomImage(starting_pos, roi_height, roi_width, summary_height, summary_width, src_height, src_width, open(srcs[1]))
 			zoomA_time = toc()
@@ -213,7 +205,9 @@ function process(algorithm, summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,I
 	 		decomposition_time = toc()
 
 			output,filters_time = process(algorithm,summary_size::Tuple{Int64,Int64}, roi::Tuple{Int64,Int64},band_A,band_B,band_C) 			
-			total_time = toc()
+			
+			#We only want to measure the filter processing time. Not the matrix operations
+			total_time = toc()  - (zoomA_time+zoomB_time+zoomC_time+decomposition_time)
 			
 			new_test = round([zoomA_time,zoomB_time,zoomC_time,decomposition_time,filters_time[1],filters_time[2],filters_time[3],total_time]',4)
 			new_test = vcat(test_log, new_test)			
